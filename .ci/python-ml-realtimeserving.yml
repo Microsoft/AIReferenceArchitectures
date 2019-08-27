@@ -1,0 +1,83 @@
+# MLAKSDeploy Pipeline
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - master
+  paths:
+    include:
+      - architectures/Python-ML-RealTimeServing/*
+
+pr:
+  branches:    
+    include:
+    - master
+  paths:
+   include:
+     - architectures/Python-Keras-RealTimeServing/* 
+
+schedules:
+- cron: "0 0 * * *"
+  displayName: Daily midnight build
+  branches:
+    include:
+    - master
+  always: true
+
+variables:
+  deployment_name: ''
+  template: ''
+  azureSubscription: ''
+  azure_subscription: ''
+  azureresourcegroup: ''
+  workspacename: ''
+  azureregion: ''
+  aksimagename: ''
+  environment: 'tridant-ai'
+  doCleanup: True
+  alias: '-'
+  project: '-'
+  expires : "2019-08-01"
+  agent: 'AI-GPU'
+  python_path: "$(System.DefaultWorkingDirectory)/architectures/Python-ML-RealTimeServing/{{cookiecutter.project_name}}/"
+
+jobs:
+- job: MLAKSDeployAMLJob
+  timeoutInMinutes: 300
+  cancelTimeoutInMinutes: 2
+  pool:
+    vmImage: 'Ubuntu-16.04'
+  steps:
+  - template: deploy_rts.yml
+    parameters:
+      azureSubscription: ${{parameters.azureSubscription}}
+      azureresourcegroup: ${{parameters.azureresourcegroup}}
+      location: ${{parameters.azureregion}}
+      alias : ${{parameters.alias}}
+      project : ${{parameters.project}}
+      expires : ${{parameters.expires}}
+      conda: ${{parameters.conda}}
+      azure_subscription: ${{parameters.azure_subscription}}
+      workspacename: ${{parameters.workspacename}}
+      azureregion: ${{parameters.azureregion}}
+      aksimagename: ${{parameters.aksimagename}}
+      aks_name: ${{parameters.aks_name}}
+      aks_location: ${{parameters.azureregion}}
+      aks_service_name: ${{parameters.aks_service_name}}
+      python_path: $(python_path)
+
+  - bash: |
+      source /usr/share/miniconda/etc/profile.d/conda.sh
+      conda activate MLAKSDeployAML
+      echo Execute Resource Group Delete
+      existResponse=$(az group exists -n $(azureresourcegroup))
+      if [ "$existResponse" == "true" ]; then
+        echo Deleting project resource group
+        az group delete --name $(azureresourcegroup) --yes
+      else
+        echo Project resource group did not exist
+      fi
+      echo Done Cleanup
+    displayName: 'Backup Cleanup'
+    condition: or(canceled(),failed())

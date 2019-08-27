@@ -1,0 +1,99 @@
+# Pipeline for testing AKSDeploymentTutorialAML
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - architectures/Python-Keras-RealTimeServing/*
+
+pr:
+  branches:    
+    include:
+    - master
+  paths:
+   include:
+     - architectures/Python-Keras-RealTimeServing/* 
+
+schedules:
+- cron: "0 0 * * *"
+  displayName: Daily midnight build
+  branches:
+    include:
+    - master
+  always: true
+
+variables:
+  deployment_name: ''
+  template: ''
+  azureSubscription: ''
+  azure_subscription: ''
+  azureresourcegroup: ''
+  workspacename: ''
+  azureregion: ''
+  aksimagename: ''
+  environment: 'tridant-ai'
+  doCleanup: True
+  alias: '-'
+  project: '-'
+  expires : "2019-08-01"
+  agent: 'AI-GPU'
+  python_path: "$(System.DefaultWorkingDirectory)/architectures/Python-Keras-RealTimeServing/{{cookiecutter.project_name}}/"
+
+jobs:
+- job: AKSDeployAMLJob
+  timeoutInMinutes: 300
+  cancelTimeoutInMinutes: 2
+  pool:
+    name: AKSDeployment
+    vmImage: 'GpuSelfHostedAgent'
+
+  steps:
+  - script: echo Hello, AKSDeployment!
+    displayName: 'Builds source for AKSDeploymentTutorialAML/Keras_Tensorflow'
+
+  - template: deploy_rts.yml
+    parameters:
+      azureSubscription: ${{parameters.azureSubscription}}
+      azureresourcegroup: ${{parameters.azureresourcegroup}}
+      location: ${{parameters.azureregion}}
+      alias : ${{parameters.alias}}
+      project : ${{parameters.project}}
+      expires : ${{parameters.expires}}
+      conda: ${{parameters.conda}}
+      azure_subscription: ${{parameters.azure_subscription}}
+      workspacename: ${{parameters.workspacename}}
+      azureregion: ${{parameters.azureregion}}
+      aksimagename: ${{parameters.aksimagename}}
+      aks_name: ${{parameters.aks_name}}
+      aks_location: ${{parameters.azureregion}}
+      aks_service_name: ${{parameters.aks_service_name}}
+      python_path: $(python_path)
+
+  - bash: |
+      echo Remove All Docker Containers
+      docker stop $(docker ps -a -q)
+      docker rm $(docker ps -a -q)
+      docker rmi $(docker images -q)
+
+      echo Removing extensions
+      az extension remove --name azure-cli-iot-ext --debug
+      rm -r -f /home/CicdAdmin/.azure/cliextensions/azure-cli-iot-ext
+
+      echo Remove Conda Environment
+      conda remove -n deployment_aml --all -q --force -y
+      conda env list
+
+      echo Ensure Resource Group Deletion
+      existResponse=$(az group exists -n $(azureresourcegroup))
+      if [ "$existResponse" == "true" ]; then
+        echo Deleting project resource group
+        az group delete --name $(azureresourcegroup) --yes
+      else
+        echo Project resource group did not exist
+      fi
+      echo Done Cleanup
+    displayName: 'Cleanup Task'
+    condition: always()

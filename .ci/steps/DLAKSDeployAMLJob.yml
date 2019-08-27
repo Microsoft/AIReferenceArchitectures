@@ -1,0 +1,72 @@
+
+
+parameters:
+  azureSubscription: ''
+  azure_subscription: ''
+  location: DeployDeepModelKubernetes/{{cookiecutter.project_name}}/Keras_Tensorflow
+  azureresourcegroup: dcibhpdl
+  workspacename: dcibhpwsdl
+  azureregion: westus2
+  aksimagename: dcibhpaksdl
+  aks_name: dcibhpaksdl
+  aks_service_name: dcibhpaksdlapi
+  conda: deployment_aml
+  doCleanup: true
+
+steps:
+- template: config_conda.yml
+  parameters:
+    location: ${{parameters.location}}
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: ${{parameters.conda}}
+
+- template: azpapermill.yml
+  parameters:
+    notebook: 00_AMLSetup.ipynb
+    location: ${{parameters.location}}
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: ${{parameters.conda}}
+    azure_subscription: ${{parameters.azure_subscription}}
+    azureresourcegroup: ${{parameters.azureresourcegroup}}
+    workspacename: ${{parameters.workspacename}}
+    azureregion: ${{parameters.azureregion}}
+    aksimagename: ${{parameters.aksimagename}}
+
+- template: azpapermill.yml
+  parameters:
+    notebook: 01_DevelopModel.ipynb
+    location: ${{parameters.location}}
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: ${{parameters.conda}}
+
+- template: azpapermill.yml
+  parameters:
+    notebook: 02_DevelopModelDriver.ipynb
+    location: ${{parameters.location}}
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: ${{parameters.conda}}
+
+- template: azpapermill.yml
+  parameters:
+    notebook: 03_BuildImage.ipynb
+    location: ${{parameters.location}}
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: ${{parameters.conda}}
+
+- template: azpapermill.yml
+  parameters:
+    notebook: 04_DeployOnAKS.ipynb
+    location: ${{parameters.location}}/aks
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: ${{parameters.conda}}
+    aks_name: ${{parameters.aks_name}}
+    aks_location: ${{parameters.azureregion}}
+    aks_service_name: ${{parameters.aks_service_name}}
+    python_path: "$(System.DefaultWorkingDirectory)/DeployMLModelKubernetes/{{cookiecutter.project_name}}/Keras_Tensorflow"
+
+- template: cleanuptask.yml
+  parameters:
+    azureSubscription: ${{parameters.azureSubscription}}
+    conda: deployment_aml
+    azureresourcegroup: ${{parameters.azureresourcegroup}}
+    doCleanup: ${{parameters.doCleanup}}
